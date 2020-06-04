@@ -1,0 +1,57 @@
+orbs:
+  gcp-gke: circleci/gcp-gke@1.0.4
+version: 2.1
+jobs:
+  test:
+    docker:
+      - image: zhenghongli/sample-webapp:0.0.1
+    steps:
+      - python test
+      - run:
+        command:  python test.py
+jobs:
+  build-docker:
+    build:
+      machine: true
+      steps:
+        - checkout
+        # start proprietary DB using private Docker image
+        # with credentials stored in the UI
+        - run: |
+            echo "$DOCKER_PASS" | docker login --username $DOCKER_USER --password-stdin
+
+        # build the application image
+        - run: docker build -t zhenghongli/sample-webapp:0.0.1
+
+        # deploy the image
+        - run: docker push zhenghongli/sample-webapp:0.0.1
+jobs:
+  create-update:
+    docker:
+      - image: 'cimg/base:stable'
+    steps:
+      - checkout
+      - kube-orb/install-kubectl
+      - kube-orb/create-or-update-resource:
+          get-rollout-status: true
+          resource-file-path: kube-sample-webapp/sample-webapp-controller.yaml
+          resource-name: sample-webapp-controller
+          show-kubectl-command: true
+jobs:
+  create-update:
+    docker:
+      - image: 'cimg/base:stable'
+    steps:
+      - checkout
+      - kube-orb/install-kubectl
+      - kube-orb/create-or-update-resource:
+          get-rollout-status: true
+          resource-file-path: kube-sample-webapp/sample-webapp-service.yaml
+          resource-name: sample-webapp-service
+          show-kubectl-command: true
+
+workflows:
+  build_update_pipeline:
+    jobs:
+      - test
+      - build-docker
